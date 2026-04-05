@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Baton Dashboard</title>
+	<link rel="stylesheet" href="style.css">
+</head>
+<body>
+	<a href="#main-content" class="skip-to-content">Skip to main content</a>
+	<header>
+		<div class="header-inner">
+			<div class="header-left">
+				<button class="mobile-menu-btn" id="mobile-menu-btn" onclick="toggleSidebar()" aria-label="Toggle navigation menu">&#9776;</button>
+				<h1>Baton Dashboard</h1>
+			</div>
+			<div class="header-right">
+				<span id="connection-status" class="connection-status" aria-live="polite">
+					<span class="connection-dot disconnected" id="connection-dot"></span>
+					<span id="connection-label">Disconnected</span>
+				</span>
+				<span id="refresh-status" class="refresh-status">Auto-refresh: ON</span>
+			</div>
+		</div>
+		<div class="stats-bar" id="stats-bar">
+			<div class="stat-item">
+				<span class="stat-label">Input Tokens</span>
+				<span class="stat-value" id="stat-input">-</span>
+			</div>
+			<div class="stat-item">
+				<span class="stat-label">Output Tokens</span>
+				<span class="stat-value" id="stat-output">-</span>
+			</div>
+			<div class="stat-item">
+				<span class="stat-label">Total Tokens</span>
+				<span class="stat-value" id="stat-total">-</span>
+			</div>
+			<div class="stat-item">
+				<span class="stat-label">Est. Cost</span>
+				<span class="stat-value highlight" id="stat-cost">-</span>
+			</div>
+		</div>
+	</header>
+
+	<div id="sidebar-overlay" class="sidebar-overlay hidden" onclick="closeSidebar()"></div>
+
+	<main role="main">
+		<div class="sidebar" id="sidebar">
+			<nav role="navigation" aria-label="Panel navigation">
+				<button class="nav-btn active" id="btn-jobs" onclick="showPanel('jobs')" aria-label="Show jobs panel">Jobs</button>
+				<button class="nav-btn" id="btn-chains" onclick="showPanel('chains')" aria-label="Show chains panel">Chains</button>
+			</nav>
+
+			<div class="filter-bar">
+				<input type="text" id="search-input" class="search-input" placeholder="Search... (press / to focus)" oninput="applyFilters()" aria-label="Search jobs and chains">
+				<select id="status-filter" class="status-filter" onchange="applyFilters()" aria-label="Filter by status">
+					<option value="">All</option>
+					<option value="running">Running</option>
+					<option value="done">Done</option>
+					<option value="failed">Failed</option>
+					<option value="waiting">Waiting</option>
+					<option value="planning">Planning</option>
+					<option value="paused">Paused</option>
+					<option value="cancelled">Cancelled</option>
+				</select>
+			</div>
+
+			<section id="panel-jobs" class="panel">
+				<div class="panel-header">
+					<h2>Jobs</h2>
+					<button class="btn-refresh" onclick="fetchJobs()">Refresh</button>
+				</div>
+				<div id="job-list" class="item-list">
+					<p class="loading">Loading...</p>
+				</div>
+			</section>
+
+			<section id="panel-chains" class="panel hidden">
+				<div class="panel-header">
+					<h2>Chains</h2>
+					<button class="btn-refresh" onclick="fetchChains()">Refresh</button>
+				</div>
+				<div id="chain-list" class="item-list">
+					<p class="loading">Loading...</p>
+				</div>
+			</section>
+		</div>
+
+		<div class="detail-area" id="main-content">
+			<section id="detail-panel" class="detail-panel">
+				<div id="detail-placeholder" class="placeholder">
+					<p>Select a job or chain to view details</p>
+				</div>
+
+				<div id="job-detail" class="hidden">
+					<div class="detail-header">
+						<div class="detail-header-text">
+							<h2 id="detail-job-id"></h2>
+							<p id="detail-job-goal" class="secondary"></p>
+						</div>
+						<span id="detail-job-status" class="badge"></span>
+					</div>
+
+					<div class="action-bar" id="job-actions">
+						<button class="btn btn-approve hidden" id="btn-approve" onclick="approveCurrentJob()" aria-label="Approve job">Approve</button>
+						<button class="btn btn-reject hidden" id="btn-reject" onclick="rejectCurrentJob()" aria-label="Reject job">Reject</button>
+						<button class="btn btn-cancel hidden" id="btn-cancel" onclick="cancelCurrentJob()" aria-label="Cancel job">Cancel</button>
+						<button class="btn btn-retry hidden" id="btn-retry" onclick="retryCurrentJob()" aria-label="Retry job">Retry</button>
+						<button class="btn btn-resume hidden" id="btn-resume" onclick="resumeCurrentJob()" aria-label="Resume job">Resume</button>
+					</div>
+
+					<div class="steer-box">
+						<h3>Steer Job</h3>
+						<textarea id="steer-input" placeholder="Enter steer message..." rows="3"></textarea>
+						<button class="btn btn-steer" onclick="steerCurrentJob()">Send Steer</button>
+					</div>
+
+					<div class="detail-section">
+						<h3>Token Usage</h3>
+						<div id="detail-token-usage" class="token-grid"></div>
+					</div>
+
+					<div class="detail-section">
+						<h3 class="collapsible-header" onclick="toggleSection('steer-history')">
+							Steer History <span class="collapse-icon" id="icon-steer-history">&#9660;</span>
+						</h3>
+						<div id="steer-history" class="collapsible-body">
+							<div id="detail-steer-history"><p class="secondary">No steer messages.</p></div>
+						</div>
+					</div>
+
+					<div class="detail-section">
+						<h3>Steps</h3>
+						<div id="detail-steps"></div>
+					</div>
+
+					<div class="detail-section">
+						<h3 class="collapsible-header" onclick="toggleSection('section-artifacts')">
+							Artifacts <span class="collapse-icon" id="icon-section-artifacts">&#9654;</span>
+						</h3>
+						<div id="section-artifacts" class="collapsible-body collapsed">
+							<div id="detail-artifacts"><p class="secondary loading-small">Expand to load...</p></div>
+						</div>
+					</div>
+
+					<div class="detail-section">
+						<h3 class="collapsible-header" onclick="toggleSection('section-planning')">
+							Planning <span class="collapse-icon" id="icon-section-planning">&#9654;</span>
+						</h3>
+						<div id="section-planning" class="collapsible-body collapsed">
+							<div id="detail-planning"><p class="secondary loading-small">Expand to load...</p></div>
+						</div>
+					</div>
+
+					<div class="detail-section">
+						<h3 class="collapsible-header" onclick="toggleSection('section-evaluator')">
+							Evaluator <span class="collapse-icon" id="icon-section-evaluator">&#9654;</span>
+						</h3>
+						<div id="section-evaluator" class="collapsible-body collapsed">
+							<div id="detail-evaluator"><p class="secondary loading-small">Expand to load...</p></div>
+						</div>
+					</div>
+
+					<div class="detail-section">
+						<h3 class="collapsible-header" onclick="toggleSection('section-events')">
+							Events <span class="collapse-icon" id="icon-section-events">&#9660;</span>
+						</h3>
+						<div id="section-events" class="collapsible-body">
+							<div id="detail-events"></div>
+						</div>
+					</div>
+
+					<div class="detail-section">
+						<h3>Live Events <span class="sse-indicator sse-off" id="sse-indicator" title="Disconnected"></span></h3>
+						<div id="detail-sse-events" class="sse-event-list"></div>
+					</div>
+				</div>
+
+				<div id="chain-detail" class="hidden">
+					<div class="detail-header">
+						<div class="detail-header-text">
+							<h2 id="detail-chain-id"></h2>
+							<p id="detail-chain-goal" class="secondary"></p>
+						</div>
+						<span id="detail-chain-status" class="badge"></span>
+					</div>
+
+					<div class="detail-section">
+						<h3>Progress</h3>
+						<div id="detail-chain-progress"></div>
+					</div>
+
+					<div class="detail-section">
+						<h3>Goals</h3>
+						<div id="detail-chain-goals"></div>
+					</div>
+				</div>
+			</section>
+
+			<div id="error-banner" class="error-banner hidden"></div>
+		</div>
+	</main>
+
+	<div id="toast-container" class="toast-container" aria-live="polite" aria-label="Notifications"></div>
+
+	<div id="kbd-help-modal" class="kbd-help-overlay hidden" onclick="closeKbdHelp(event)">
+		<div class="kbd-help-panel" onclick="event.stopPropagation()">
+			<h2>Keyboard Shortcuts</h2>
+			<div class="kbd-row"><span class="kbd-key">j</span><span class="kbd-desc">Next job</span></div>
+			<div class="kbd-row"><span class="kbd-key">k</span><span class="kbd-desc">Previous job</span></div>
+			<div class="kbd-row"><span class="kbd-key">Enter</span><span class="kbd-desc">Open selected</span></div>
+			<div class="kbd-row"><span class="kbd-key">Esc</span><span class="kbd-desc">Deselect / Close</span></div>
+			<div class="kbd-row"><span class="kbd-key">/</span><span class="kbd-desc">Focus search</span></div>
+			<div class="kbd-row"><span class="kbd-key">?</span><span class="kbd-desc">Toggle this help</span></div>
+			<div class="kbd-row"><span class="kbd-key">r</span><span class="kbd-desc">Refresh</span></div>
+		</div>
+	</div>
+
+	<script src="app.js" defer></script>
+</body>
+</html>
