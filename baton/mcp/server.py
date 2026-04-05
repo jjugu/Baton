@@ -2,8 +2,6 @@
 
 Reads newline-delimited JSON-RPC 2.0 requests from stdin and writes
 responses to stdout. All 18 tools are exposed as baton_* tools.
-
-Ported from gorchera/internal/mcp/server.go.
 """
 
 from __future__ import annotations

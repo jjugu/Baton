@@ -1,7 +1,6 @@
 """Domain types for the baton orchestration engine.
 
-All Pydantic models, enums, and helper functions ported from
-gorchera/internal/domain/types.go using Python idioms.
+All Pydantic models, enums, and helper functions using Python idioms.
 """
 
 from __future__ import annotations

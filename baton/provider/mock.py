@@ -1,6 +1,5 @@
 """Mock provider adapter for testing.
 
-Ported from gorchera/internal/provider/mock/mock.go.
 Deterministic responses that exercise the state machine without real LLM calls.
 """
 

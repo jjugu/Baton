@@ -1,7 +1,7 @@
 """Common pytest fixtures for baton test suite.
 
-Provides Go-source-derived reference data so every test module can
-cross-validate Python implementations against the canonical gorchera types.
+Provides reference data so every test module can
+cross-validate Python implementations against the canonical baton types.
 """
 from __future__ import annotations
 
@@ -154,30 +154,31 @@ GO_EVALUATOR_STATUSES = frozenset({
     "blocked",
 })
 
-# MCP tool names (19 tools) from mcp/server.go toolList()
-GO_MCP_TOOL_NAMES = [
-    "gorchera_start_job",
-    "gorchera_start_chain",
-    "gorchera_list_jobs",
-    "gorchera_status",
-    "gorchera_chain_status",
-    "gorchera_pause_chain",
-    "gorchera_resume_chain",
-    "gorchera_cancel_chain",
-    "gorchera_skip_chain_goal",
-    "gorchera_events",
-    "gorchera_artifacts",
-    "gorchera_approve",
-    "gorchera_reject",
-    "gorchera_retry",
-    "gorchera_cancel",
-    "gorchera_resume",
-    "gorchera_steer",
-    "gorchera_diff",
+# MCP tool names (18 tools)
+MCP_TOOL_NAMES = [
+    "baton_start_job",
+    "baton_start_chain",
+    "baton_list_jobs",
+    "baton_status",
+    "baton_chain_status",
+    "baton_pause_chain",
+    "baton_resume_chain",
+    "baton_cancel_chain",
+    "baton_skip_chain_goal",
+    "baton_events",
+    "baton_artifacts",
+    "baton_approve",
+    "baton_reject",
+    "baton_retry",
+    "baton_cancel",
+    "baton_resume",
+    "baton_steer",
+    "baton_diff",
 ]
 
-# Baton equivalents (gorchera_* -> baton_*)
-BATON_MCP_TOOL_NAMES = [name.replace("gorchera_", "baton_") for name in GO_MCP_TOOL_NAMES]
+# Backward-compat aliases
+GO_MCP_TOOL_NAMES = MCP_TOOL_NAMES
+BATON_MCP_TOOL_NAMES = MCP_TOOL_NAMES
 
 # API endpoints from api/server.go
 GO_API_ENDPOINTS = [

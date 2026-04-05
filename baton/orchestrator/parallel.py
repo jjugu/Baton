@@ -1,7 +1,4 @@
-"""Parallel worker fan-out (max 2 workers).
-
-Ported from gorchera/internal/orchestrator/parallel.go.
-"""
+"""Parallel worker fan-out (max 2 workers)."""
 
 from __future__ import annotations
 

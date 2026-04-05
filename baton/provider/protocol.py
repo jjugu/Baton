@@ -1,6 +1,5 @@
 """Prompt builders and JSON schemas for each pipeline phase.
 
-Ported from gorchera/internal/provider/protocol.go.
 Schemas are strict-mode JSON Schema (all required, additionalProperties: false).
 """
 

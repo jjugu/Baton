@@ -1,7 +1,4 @@
-"""Claude CLI adapter.
-
-Ported from gorchera/internal/provider/claude.go.
-"""
+"""Claude CLI adapter."""
 
 from __future__ import annotations
 

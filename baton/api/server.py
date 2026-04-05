@@ -1,7 +1,4 @@
-"""FastAPI application setup and middleware.
-
-Ported from gorchera/internal/api/server.go.
-"""
+"""FastAPI application setup and middleware."""
 
 from __future__ import annotations
 

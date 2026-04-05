@@ -1,8 +1,7 @@
 """Provider adapter protocols.
 
 Defines the async interface that every provider (codex, claude, mock) must
-implement. Ported from gorchera/internal/provider/provider.go using
-Python Protocol classes instead of Go interfaces.
+implement using Python Protocol classes.
 """
 
 from __future__ import annotations

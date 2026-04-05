@@ -1,6 +1,5 @@
 """Typer CLI for baton.
 
-Ported from gorchera/cmd/gorchera/main.go.
 All 22 subcommands are replicated with Python idioms.
 """
 

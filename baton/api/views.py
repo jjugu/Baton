@@ -1,7 +1,4 @@
-"""Response DTOs (Pydantic models) for the HTTP API.
-
-Ported from gorchera/internal/api/views.go.
-"""
+"""Response DTOs (Pydantic models) for the HTTP API."""
 
 from __future__ import annotations
 

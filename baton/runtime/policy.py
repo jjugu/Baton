@@ -1,7 +1,4 @@
-"""Runtime command allowlist policy.
-
-Ported from gorchera/internal/runtime/policy.go.
-"""
+"""Runtime command allowlist policy."""
 
 from __future__ import annotations
 

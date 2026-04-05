@@ -125,10 +125,10 @@ class TestMCPToolsIntegration:
         for tool in _tool_list():
             assert tool["name"].startswith("baton_"), f"Tool {tool['name']} missing baton_ prefix"
 
-    def test_no_gorchera_prefix(self) -> None:
+    def test_all_tools_have_baton_prefix(self) -> None:
         from baton.mcp.server import _tool_list
         for tool in _tool_list():
-            assert not tool["name"].startswith("gorchera_"), f"Tool {tool['name']} still has gorchera_ prefix"
+            assert tool["name"].startswith("baton_"), f"Tool {tool['name']} does not have baton_ prefix"
 
     def test_all_have_input_schema(self) -> None:
         from baton.mcp.server import _tool_list

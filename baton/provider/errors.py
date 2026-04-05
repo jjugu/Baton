@@ -1,7 +1,6 @@
 """Provider error taxonomy.
 
-12 error kinds with recommended actions (retry / block / fail),
-ported from gorchera/internal/provider/errors.go.
+12 error kinds with recommended actions (retry / block / fail).
 """
 
 from __future__ import annotations

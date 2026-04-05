@@ -1,7 +1,4 @@
-"""Verification contract management.
-
-Ported from gorchera/internal/orchestrator/verification.go.
-"""
+"""Verification contract management."""
 
 from __future__ import annotations
 

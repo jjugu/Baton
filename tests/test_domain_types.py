@@ -1,4 +1,4 @@
-"""Cross-validate baton/domain/types.py against Go gorchera/internal/domain/types.go.
+"""Cross-validate baton/domain/types.py against the canonical reference data.
 
 Every assertion compares the Python implementation against the Go-canonical
 reference data in conftest.py.

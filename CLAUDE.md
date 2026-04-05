@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Baton — Python asyncio 기반 멀티 에이전트 오케스트레이션 엔진. gorchera(Go)의 Python 재구현.
+Baton — Python asyncio 기반 멀티 에이전트 오케스트레이션 엔진.
 
 ## Build & Verify
 
@@ -14,7 +14,6 @@ python -m baton --help
 
 - **3-agent pipeline**: director → executor → [engine build/test] → evaluator
 - **Python 3.12+**, Pydantic v2, FastAPI, Typer, asyncio
-- Go 원본 참조: `C:/Claude/kmOffice/gorchera/`
 
 ## Core Principles
 
@@ -45,10 +44,9 @@ python -m baton --help
 
 ## MCP Tool Naming
 
-gorchera의 `gorchera_*` 도구 → baton의 `baton_*` 도구로 변경 (18개 도구)
+MCP 도구는 `baton_*` 네이밍 (18개 도구)
 
 ## Rules
 
 - 코드 변경 후 반드시 `pytest` 실행
 - 행동 변경 시 docs/ 업데이트
-- Go 원본과 기능 대등성 유지

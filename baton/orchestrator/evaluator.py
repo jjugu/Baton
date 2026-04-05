@@ -1,6 +1,5 @@
 """Evaluator -- completion gate logic.
 
-Ported from gorchera/internal/orchestrator/evaluator.go.
 The evaluateCompletion flow is the CORE INVARIANT of the engine:
 done is NEVER reached without passing through this gate.
 """

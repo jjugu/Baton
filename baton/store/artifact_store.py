@@ -1,7 +1,4 @@
-"""Artifact store -- materializes step outputs and named artifacts.
-
-Ported from gorchera/internal/store/artifact_store.go.
-"""
+"""Artifact store -- materializes step outputs and named artifacts."""
 
 from __future__ import annotations
 

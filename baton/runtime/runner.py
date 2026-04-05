@@ -1,6 +1,5 @@
 """Async subprocess runner.
 
-Ported from gorchera/internal/runtime/runner.go.
 Uses asyncio.create_subprocess_exec instead of os/exec.
 """
 

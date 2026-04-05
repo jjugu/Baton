@@ -1,6 +1,6 @@
 # Baton Python Architecture Spec
 
-gorchera Go → baton Python 재구현의 타겟 아키텍처.
+Baton Python 오케스트레이션 엔진의 아키텍처.
 
 ## 패키지 구조
 
@@ -84,22 +84,22 @@ api (← domain, orchestrator, store)
 cli (← orchestrator, mcp, api)
 ```
 
-## 핵심 타입 매핑 (Go → Python)
+## 핵심 타입 패턴
 
-| Go | Python |
-|----|--------|
-| `struct Job` | `class Job(BaseModel)` |
-| `JobStatus` (string const) | `class JobStatus(str, Enum)` |
-| `interface Adapter` | `class Adapter(Protocol)` |
-| `map[string]RoleOverride` | `dict[str, RoleOverride]` |
-| `context.Context` | `asyncio` 패턴 (CancelScope) |
-| `sync.Mutex` | `asyncio.Lock` |
-| `chan Event` | `asyncio.Queue[Event]` |
-| `goroutine` | `asyncio.create_task()` |
-| `os/exec.Cmd` | `asyncio.create_subprocess_exec()` |
-| `embed.FS` | `importlib.resources` 또는 FastAPI StaticFiles |
+| 개념 | Python 구현 |
+|------|------------|
+| 도메인 모델 | `class Job(BaseModel)` (Pydantic) |
+| 상태 열거 | `class JobStatus(str, Enum)` |
+| 어댑터 인터페이스 | `class Adapter(Protocol)` |
+| 역할 오버라이드 | `dict[str, RoleOverride]` |
+| 비동기 컨텍스트 | `asyncio` 패턴 (CancelScope) |
+| 뮤텍스 | `asyncio.Lock` |
+| 이벤트 채널 | `asyncio.Queue[Event]` |
+| 병렬 실행 | `asyncio.create_task()` |
+| 서브프로세스 | `asyncio.create_subprocess_exec()` |
+| 정적 파일 | `importlib.resources` 또는 FastAPI StaticFiles |
 
-## 상태 머신 (Go와 동일하게 유지)
+## 상태 머신
 
 ```
 starting → planning → waiting_leader → waiting_worker → running → (loop)
@@ -111,7 +111,7 @@ max_steps_exceeded → blocked
 
 터미널 상태: `done`, `failed`, `blocked`
 
-## 환경 변수 (Go와 동일)
+## 환경 변수
 
 | 변수 | 용도 |
 |------|------|

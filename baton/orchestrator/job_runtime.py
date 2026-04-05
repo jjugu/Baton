@@ -1,7 +1,4 @@
-"""Job lease management -- heartbeat and recovery.
-
-Ported from gorchera/internal/orchestrator/job_runtime.go.
-"""
+"""Job lease management -- heartbeat and recovery."""
 
 from __future__ import annotations
 

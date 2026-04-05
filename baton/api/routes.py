@@ -1,6 +1,5 @@
 """HTTP endpoint handlers for the baton API.
 
-Ported from gorchera/internal/api/server.go + harness.go.
 All routes are registered on the FastAPI app in server.py.
 """
 

@@ -1,7 +1,4 @@
-"""Atomic JSON state store for Jobs and Chains.
-
-Ported from gorchera/internal/store/state_store.go.
-"""
+"""Atomic JSON state store for Jobs and Chains."""
 
 from __future__ import annotations
 

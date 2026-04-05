@@ -1,6 +1,5 @@
 """Orchestrator service -- core loop, job lifecycle, chain management.
 
-Ported from gorchera/internal/orchestrator/service.go.
 The evaluator gate (evaluateCompletion) is NEVER bypassed.
 """
 

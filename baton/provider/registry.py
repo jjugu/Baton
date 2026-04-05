@@ -1,7 +1,4 @@
-"""Provider registry and session manager.
-
-Ported from gorchera/internal/provider/provider.go (Registry + SessionManager).
-"""
+"""Provider registry and session manager."""
 
 from __future__ import annotations
 

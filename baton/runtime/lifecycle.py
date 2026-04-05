@@ -1,6 +1,5 @@
 """Process lifecycle manager -- start/stop/watch long-running processes.
 
-Ported from gorchera/internal/runtime/lifecycle.go.
 Uses asyncio instead of goroutines + sync.Mutex.
 """
 

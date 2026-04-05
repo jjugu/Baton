@@ -1,7 +1,4 @@
-"""Codex CLI adapter.
-
-Ported from gorchera/internal/provider/codex.go.
-"""
+"""Codex CLI adapter."""
 
 from __future__ import annotations
 

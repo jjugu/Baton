@@ -1,7 +1,4 @@
-"""Workspace validation and preparation.
-
-Ported from gorchera/internal/orchestrator/workspace.go.
-"""
+"""Workspace validation and preparation."""
 
 from __future__ import annotations
 

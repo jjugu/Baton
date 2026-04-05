@@ -1,7 +1,4 @@
-"""Runtime types -- request/result/process models.
-
-Ported from gorchera/internal/runtime/types.go.
-"""
+"""Runtime types -- request/result/process models."""
 
 from __future__ import annotations
 

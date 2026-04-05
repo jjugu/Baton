@@ -1,7 +1,4 @@
-"""Planning phase -- planner execution, artifact building, sprint contracts.
-
-Ported from gorchera/internal/orchestrator/planning.go.
-"""
+"""Planning phase -- planner execution, artifact building, sprint contracts."""
 
 from __future__ import annotations
 

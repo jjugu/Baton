@@ -1,6 +1,5 @@
 """Provider subprocess command utilities.
 
-Ported from gorchera/internal/provider/command.go and util.go.
 Provides async wrappers for probing and running CLI executables.
 """
 

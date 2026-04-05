@@ -1,7 +1,4 @@
-"""Automated mechanical checks run before the evaluator LLM.
-
-Ported from gorchera/internal/orchestrator/automated_check.go.
-"""
+"""Automated mechanical checks run before the evaluator LLM."""
 
 from __future__ import annotations
 

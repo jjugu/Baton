@@ -1,7 +1,7 @@
 """Cross-validate baton/mcp/server.py against Go mcp/server.go.
 
 Tests:
-- All 18 MCP tools present with correct names (gorchera_* -> baton_*)
+- All 18 MCP tools present with correct baton_* names
 - Required parameters match Go tool definitions
 - Tool list order matches Go
 - JSON-RPC response format
@@ -33,25 +33,23 @@ class TestToolList:
         assert len(tools) == 18
 
     def test_names_match_baton_convention(self, baton_mcp_tool_names: list[str]) -> None:
-        """All tools should be gorchera_* renamed to baton_*."""
+        """All tools should use the baton_* naming convention."""
         tools = _tool_list()
         actual_names = [t["name"] for t in tools]
         assert actual_names == baton_mcp_tool_names
 
-    def test_all_go_tools_mapped(self, go_mcp_tool_names: list[str]) -> None:
-        """Every Go tool has a baton equivalent."""
+    def test_all_tools_present(self, go_mcp_tool_names: list[str]) -> None:
+        """Every expected tool is present."""
         tools = _tool_list()
         actual_names = {t["name"] for t in tools}
-        for go_name in go_mcp_tool_names:
-            baton_name = go_name.replace("gorchera_", "baton_")
-            assert baton_name in actual_names, f"Missing baton equivalent for {go_name}"
+        for name in go_mcp_tool_names:
+            assert name in actual_names, f"Missing tool: {name}"
 
-    def test_order_matches_go(self, go_mcp_tool_names: list[str]) -> None:
-        """Tool order should match Go toolList()."""
+    def test_order_matches_reference(self, go_mcp_tool_names: list[str]) -> None:
+        """Tool order should match the reference list."""
         tools = _tool_list()
         actual_names = [t["name"] for t in tools]
-        expected_names = [n.replace("gorchera_", "baton_") for n in go_mcp_tool_names]
-        assert actual_names == expected_names
+        assert actual_names == go_mcp_tool_names
 
 
 class TestToolRequiredParams:
