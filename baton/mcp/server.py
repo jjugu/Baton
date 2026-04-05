@@ -710,22 +710,27 @@ class Server:
         """Run the MCP server, reading from stdin until EOF."""
         listener = asyncio.create_task(self._listen_events())
         try:
-            loop = asyncio.get_event_loop()
-            reader = asyncio.StreamReader()
-            transport, _ = await loop.connect_read_pipe(
-                lambda: asyncio.StreamReaderProtocol(reader),
-                sys.stdin,
-            )
-            while True:
-                line = await reader.readline()
-                if not line:
-                    break
-                text = line.decode("utf-8", errors="replace").strip()
-                if not text:
-                    continue
-                resp = await self._handle_message(text)
-                if resp is not None:
-                    self._write_message(resp)
+            if sys.platform == "win32":
+                # Windows ProactorEventLoop does not support connect_read_pipe
+                # on stdin. Use a thread-based reader instead.
+                await self._run_stdin_threaded()
+            else:
+                loop = asyncio.get_event_loop()
+                reader = asyncio.StreamReader()
+                transport, _ = await loop.connect_read_pipe(
+                    lambda: asyncio.StreamReaderProtocol(reader),
+                    sys.stdin,
+                )
+                while True:
+                    line = await reader.readline()
+                    if not line:
+                        break
+                    text = line.decode("utf-8", errors="replace").strip()
+                    if not text:
+                        continue
+                    resp = await self._handle_message(text)
+                    if resp is not None:
+                        self._write_message(resp)
         finally:
             self._done.set()
             listener.cancel()
@@ -733,6 +738,20 @@ class Server:
                 await listener
             except asyncio.CancelledError:
                 pass
+
+    async def _run_stdin_threaded(self) -> None:
+        """Read stdin lines via a background thread (Windows-safe)."""
+        loop = asyncio.get_event_loop()
+        while True:
+            line = await loop.run_in_executor(None, sys.stdin.buffer.readline)
+            if not line:
+                break
+            text = line.decode("utf-8", errors="replace").strip()
+            if not text:
+                continue
+            resp = await self._handle_message(text)
+            if resp is not None:
+                self._write_message(resp)
 
     def run_sync(self) -> None:
         """Synchronous entry point for CLI usage."""
