@@ -1,199 +1,96 @@
+[한국어](#baton-ko) | [English](#baton-en)
+
+---
+
+<a id="baton-ko"></a>
+
 # Baton
 
-Python asyncio multi-agent orchestration engine.  
-Director, Executor, Evaluator 3-agent pipeline for automated code generation and verification.
-
----
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Architecture](#architecture)
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Claude Code MCP Integration](#claude-code-mcp-integration)
-- [CLI Reference](#cli-reference)
-- [HTTP API Server](#http-api-server)
-- [MCP Tools](#mcp-tools)
-- [Providers](#providers)
-- [Configuration](#configuration)
-- [Job Chains](#job-chains)
-- [Harness (Process Management)](#harness-process-management)
-- [Web Dashboard](#web-dashboard)
-- [Development](#development)
-- [License](#license)
-
----
-
-## Overview
-
-Baton orchestrates multiple AI agents in a structured pipeline to plan, implement, and verify code changes. Each job flows through a strict sequence:
+Python asyncio 기반 멀티 에이전트 오케스트레이션 엔진.
 
 ```
-Director (planning) -> Leader (decisions) -> Executor (implementation) -> Evaluator (gate)
+Director (계획) -> Leader (지시) -> Executor (구현) -> Evaluator (검증 게이트)
 ```
 
-The Evaluator gate is inviolable -- a job cannot reach `done` status without explicit evaluator approval. This prevents incomplete or incorrect work from being marked as complete.
+Evaluator 게이트는 절대 우회할 수 없습니다 -- `done` 상태는 반드시 evaluator 승인을 통과해야 도달합니다.
 
-Key features:
+## 주요 기능
 
-- **3-agent pipeline** with strict evaluator gate
-- **3 providers**: Claude (Anthropic), Codex (OpenAI), Mock (testing)
-- **Per-role model configuration** (e.g., opus for reasoning, sonnet for execution)
-- **Job chains** for sequential multi-step workflows
-- **Workspace isolation** via git worktrees
-- **MCP server** for Claude Code integration
-- **HTTP API** with SSE event streaming
-- **Web dashboard** for real-time monitoring
-- **CLI** with 22 subcommands
+- **3-agent 파이프라인** -- 엄격한 evaluator 게이트
+- **3개 프로바이더** -- Claude (Anthropic), Codex (OpenAI), Mock (테스트용)
+- **역할별 모델 설정** -- opus(추론), sonnet(실행) 등 자유 배정
+- **Job 체인** -- 순차적 다단계 워크플로우
+- **워크스페이스 격리** -- git worktree를 통한 작업 분리
+- **MCP 서버** -- Claude Code 직접 통합
+- **HTTP API** -- SSE 이벤트 스트리밍 + 웹 대시보드
+- **토큰 사용량 추적** -- 실시간 비용 모니터링
+- **CLI** -- 22개 서브커맨드
+- **한국어/영어 대시보드** -- 언어 전환 지원
 
----
-
-## Architecture
-
-```
-+-------------------------------------------------------------------+
-|                        Orchestrator (Service)                      |
-|                                                                    |
-|  QUEUED -> STARTING -> PLANNING -> RUNNING -> DONE / FAILED       |
-|                                                                    |
-|  +------------+    +----------+    +-----------+    +-----------+  |
-|  |  Director  | -> |  Leader  | -> |  Executor | -> | Evaluator |  |
-|  | (planner)  |    | (decide) |    |  (worker) |    |  (gate)   |  |
-|  +------------+    +----------+    +-----------+    +-----------+  |
-|                         |                                          |
-|                    [Engine Build/Test] (optional)                   |
-+-------------------------------------------------------------------+
-        |                    |                    |
-   StateStore          ArtifactStore        ProcessManager
-   (JSON files)        (.baton/artifacts)   (subprocess)
-```
-
-### Pipeline Phases
-
-| Phase | Role | Model Tier | Purpose |
-|-------|------|-----------|---------|
-| Planning | Director | Heavy (opus) | Analyze goal, produce sprint contract with acceptance criteria |
-| Leadership | Leader | Heavy (opus) | Decide next action: run_worker, run_system, complete, fail |
-| Execution | Executor | Light (sonnet) | Implement tasks, produce artifacts |
-| Verification | Evaluator | Heavy (opus) | Gate check: all criteria met before marking done |
-
-### Core Invariants
-
-- **Evaluator gate**: `done` status is never reached without passing `evaluateCompletion()`
-- **No full log forwarding**: Agents pass artifact paths + summaries only, never entire conversation logs
-- **Executor isolation**: Executors do not spawn workers; parallelism is managed by the orchestrator
-- **Approval enforcement**: Steps requiring human approval cannot auto-pass
-
----
-
-## Requirements
-
-- **Python 3.12+**
-- **git** (for workspace isolation mode)
-- One of the following AI providers:
-  - Anthropic API key (`ANTHROPIC_API_KEY`) for Claude provider
-  - OpenAI API key for Codex provider
-  - No key needed for Mock provider (testing)
-
----
-
-## Installation
-
-### From GitHub
+## 설치
 
 ```bash
+# GitHub에서 설치
 pip install git+https://github.com/jjugu/Baton.git
-```
 
-### From source (development)
-
-```bash
+# 소스에서 설치 (개발용)
 git clone https://github.com/jjugu/Baton.git
 cd Baton
 pip install -e ".[dev]"
-```
 
-### Verify installation
-
-```bash
+# 설치 확인
 baton --help
 ```
 
----
+## 요구사항
 
-## Quick Start
+- Python 3.12+
+- git (워크스페이스 격리 모드용)
+- AI 프로바이더: `ANTHROPIC_API_KEY` (Claude) 또는 `codex login` (Codex) 또는 키 불필요 (Mock)
 
-### 1. Start a job with Mock provider (no API key needed)
-
-```bash
-baton run \
-  --goal "add a hello world endpoint to the API" \
-  --provider mock \
-  --max-steps 4
-```
-
-### 2. Start a job with Claude provider
+## 빠른 시작
 
 ```bash
+# Mock 프로바이더 (API 키 불필요)
+baton run --goal "hello world API 엔드포인트 추가" --provider mock --max-steps 4
+
+# Claude 프로바이더
 export ANTHROPIC_API_KEY="sk-ant-..."
+baton run --goal "JWT 인증 미들웨어 구현" --provider claude --max-steps 10
 
-baton run \
-  --goal "implement user authentication middleware" \
-  --provider claude \
-  --tech-stack python \
-  --max-steps 10 \
-  --constraints "use JWT tokens,don't modify existing tests" \
-  --done "all tests pass,middleware is applied to protected routes"
-```
-
-### 3. Check job status
-
-```bash
-# Single job
+# 상태 확인
 baton status --job <job-id>
-
-# All jobs
 baton status --all
 ```
 
-### 4. View events
+## 아키텍처
 
-```bash
-baton events --job <job-id>
+```
++-------------------------------------------------------------------+
+|                       Orchestrator (Service)                       |
+|                                                                    |
+|  QUEUED -> STARTING -> PLANNING -> RUNNING -> DONE / FAILED       |
+|                                                                    |
+|  +----------+    +--------+    +---------+    +-----------+        |
+|  | Director | -> | Leader | -> | Executor| -> | Evaluator |        |
+|  | (계획)   |    | (지시) |    | (구현)  |    | (검증)    |        |
+|  +----------+    +--------+    +---------+    +-----------+        |
++-------------------------------------------------------------------+
+       |                |                |
+  StateStore      ArtifactStore     ProcessManager
+  (JSON 파일)     (.baton/artifacts)  (서브프로세스)
 ```
 
-### 5. View artifacts
+| 단계 | 역할 | 모델 | 목적 |
+|------|------|------|------|
+| 계획 | Director | Heavy (opus) | 목표 분석, 스프린트 계약 생성 |
+| 지시 | Leader | Heavy (opus) | 다음 행동 결정: 워커 실행, 시스템 실행, 완료, 실패 |
+| 구현 | Executor | Light (sonnet) | 작업 구현, 아티팩트 생성 |
+| 검증 | Evaluator | Heavy (opus) | 완료 조건 충족 여부 최종 확인 |
 
-```bash
-baton artifacts --job <job-id>
-```
+## Claude Code MCP 연동
 
----
-
-## Claude Code MCP Integration
-
-Baton can run as an MCP (Model Context Protocol) server, exposing 18 tools directly inside Claude Code.
-
-### Setup
-
-Add to your project's `.mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "baton": {
-      "type": "stdio",
-      "command": "python",
-      "args": ["-m", "baton", "mcp"],
-      "cwd": "/path/to/your/workspace"
-    }
-  }
-}
-```
-
-Or if installed via pip:
+프로젝트의 `.mcp.json`에 추가:
 
 ```json
 {
@@ -207,478 +104,305 @@ Or if installed via pip:
 }
 ```
 
-### Verify connection
+Claude Code에서 `/mcp` 실행 후 18개 도구 사용 가능:
 
-Run `/mcp` in Claude Code. You should see `baton` listed as connected with 18 tools available.
+| 카테고리 | 도구 |
+|----------|------|
+| Job 관리 | `baton_start_job`, `baton_status`, `baton_events`, `baton_artifacts`, `baton_resume`, `baton_retry`, `baton_list_jobs`, `baton_diff` |
+| 체인 관리 | `baton_start_chain`, `baton_chain_status`, `baton_pause_chain`, `baton_resume_chain`, `baton_cancel_chain`, `baton_skip_chain_goal` |
+| 승인/제어 | `baton_approve`, `baton_reject`, `baton_cancel`, `baton_steer` |
 
-### Usage in Claude Code
+## CLI 명령어
 
-Once connected, Claude Code can use baton tools directly:
+| 명령어 | 설명 |
+|--------|------|
+| `baton run` | 새 job 시작 (`--goal`, `--provider`, `--max-steps`) |
+| `baton status` | job 상태 확인 (`--job` 또는 `--all`) |
+| `baton events` | job 이벤트 조회 |
+| `baton artifacts` | 아티팩트 경로 조회 |
+| `baton resume` | 중단된 job 재개 |
+| `baton approve` / `reject` | 승인 대기 중인 작업 처리 |
+| `baton retry` | 실패한 job 재시도 |
+| `baton cancel` | job 취소 |
+| `baton serve` | HTTP API + 웹 대시보드 시작 (`--addr 127.0.0.1:8080`) |
+| `baton mcp` | MCP stdio 서버 시작 |
 
-```
-# Start a job
-baton_start_job(goal="implement feature X", provider="claude")
-
-# Check status (wait for completion)
-baton_status(job_id="...", wait=true)
-
-# View diff
-baton_diff(job_id="...")
-```
-
----
-
-## CLI Reference
-
-### Job Control
-
-| Command | Description | Key Options |
-|---------|------------|-------------|
-| `baton run` | Start a new job | `--goal` (required), `--provider`, `--tech-stack`, `--max-steps`, `--constraints`, `--done`, `--workspace-mode`, `--strictness`, `--profiles-file` |
-| `baton status` | Get job status | `--job <id>` or `--all` |
-| `baton events` | Get job events | `--job <id>` |
-| `baton artifacts` | Get artifact paths | `--job <id>` |
-| `baton resume` | Resume blocked job | `--job <id>` |
-| `baton approve` | Approve pending step | `--job <id>` |
-| `baton reject` | Reject pending step | `--job <id>`, `--reason` |
-| `baton retry` | Retry failed/blocked job | `--job <id>` |
-| `baton cancel` | Cancel a job | `--job <id>`, `--reason` |
-
-### Views
-
-| Command | Description |
-|---------|------------|
-| `baton verification` | Verification view (checks, contracts) |
-| `baton planning` | Planning view (scope, steps, criteria) |
-| `baton evaluator` | Evaluator view (gate decision, score) |
-| `baton profile` | Role profile configuration view |
-
-### Server
-
-| Command | Description | Key Options |
-|---------|------------|-------------|
-| `baton serve` | Start HTTP API server | `--addr` (default: 127.0.0.1:8080), `--workspace`, `--recover` |
-| `baton stop` | Graceful shutdown | `--workspace` or `--addr` |
-| `baton stream` | Stream SSE events (client) | `--job <id>`, `--server` |
-| `baton mcp` | Start MCP stdio server | `--recover` |
-
-### Harness
-
-| Command | Description | Key Options |
-|---------|------------|-------------|
-| `baton harness-start` | Start a process | `--command` (required), `--job`, `--name`, `--timeout-seconds` |
-| `baton harness-view` | View harness state | `--job <id>` |
-| `baton harness-list` | List processes | `--job` (optional scope) |
-| `baton harness-status` | Get process status | `--pid` (required) |
-| `baton harness-stop` | Stop a process | `--pid` (required) |
-
----
-
-## HTTP API Server
-
-Start the API server:
+## HTTP API
 
 ```bash
-baton serve --addr 127.0.0.1:8080 --workspace /path/to/repo
+# 서버 시작
+baton serve --addr 127.0.0.1:8080
+
+# 대시보드: http://127.0.0.1:8080/dashboard (한/영 전환 지원)
 ```
 
-### Endpoints
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| `POST` | `/jobs` | job 생성 |
+| `GET` | `/jobs` | 전체 job 목록 |
+| `GET` | `/jobs/{id}` | job 상세 |
+| `POST` | `/jobs/{id}/approve` | 승인 |
+| `POST` | `/jobs/{id}/cancel` | 취소 |
+| `POST` | `/jobs/{id}/steer` | 지시 주입 |
+| `GET` | `/jobs/{id}/events/stream` | SSE 이벤트 스트림 |
+| `POST` | `/chains` | 체인 생성 |
+| `GET` | `/healthz` | 헬스 체크 |
 
-**Jobs**
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/jobs` | List all jobs |
-| `POST` | `/jobs` | Start a new job |
-| `GET` | `/jobs/{id}` | Get job details |
-| `POST` | `/jobs/{id}/resume` | Resume blocked job |
-| `POST` | `/jobs/{id}/approve` | Approve pending step |
-| `POST` | `/jobs/{id}/reject` | Reject pending step |
-| `POST` | `/jobs/{id}/retry` | Retry job |
-| `POST` | `/jobs/{id}/cancel` | Cancel job |
-| `POST` | `/jobs/{id}/steer` | Inject supervisor directive |
-| `GET` | `/jobs/{id}/events` | List events |
-| `GET` | `/jobs/{id}/events/stream` | SSE event stream |
-| `GET` | `/jobs/{id}/artifacts` | Get artifacts |
-| `GET` | `/jobs/{id}/verification` | Verification view |
-| `GET` | `/jobs/{id}/planning` | Planning view |
-| `GET` | `/jobs/{id}/evaluator` | Evaluator view |
-| `GET` | `/jobs/{id}/profile` | Profile view |
-
-**Chains**
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/chains` | List all chains |
-| `POST` | `/chains` | Start a chain |
-| `GET` | `/chains/{id}` | Get chain status |
-
-**Harness**
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/harness/processes` | List global processes |
-| `POST` | `/harness/processes` | Start a process |
-| `GET` | `/harness/processes/{pid}` | Get process |
-| `POST` | `/harness/processes/{pid}/stop` | Stop process |
-| `GET` | `/jobs/{id}/harness/processes` | List job processes |
-| `POST` | `/jobs/{id}/harness/processes` | Start job process |
-
-**Admin**
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/healthz` | Health check |
-| `GET` | `/` | Web dashboard |
-| `POST` | `/admin/shutdown` | Graceful shutdown |
-| `POST` | `/admin/workspace` | Switch workspace |
-| `GET` | `/admin/workspace` | Get current workspace |
-
-### Example: Start a job via API
+## 프로바이더 설정
 
 ```bash
-curl -X POST http://localhost:8080/jobs \
-  -H "Content-Type: application/json" \
-  -d '{
-    "goal": "add logging middleware",
-    "provider": "claude",
-    "tech_stack": "python",
-    "max_steps": 8
-  }'
-```
-
-### Example: Stream events via SSE
-
-```bash
-curl -N http://localhost:8080/jobs/<job-id>/events/stream
-```
-
----
-
-## MCP Tools
-
-18 tools are exposed via the MCP server:
-
-### Job Management
-
-| Tool | Description |
-|------|-------------|
-| `baton_start_job` | Start a new job with full configuration |
-| `baton_status` | Get job status (supports `wait=true` for blocking) |
-| `baton_events` | Get recent events (`last_n` configurable) |
-| `baton_artifacts` | Get artifact paths |
-| `baton_resume` | Resume blocked job (`extra_steps` 1-20) |
-| `baton_retry` | Retry failed/blocked job |
-| `baton_list_jobs` | List all jobs |
-| `baton_diff` | Show git diff for job workspace |
-
-### Chain Management
-
-| Tool | Description |
-|------|-------------|
-| `baton_start_chain` | Start sequential chain of jobs |
-| `baton_chain_status` | Get chain status (supports `wait`) |
-| `baton_pause_chain` | Pause after current goal completes |
-| `baton_resume_chain` | Resume paused chain |
-| `baton_cancel_chain` | Cancel chain |
-| `baton_skip_chain_goal` | Skip current goal, advance to next |
-
-### Approvals & Control
-
-| Tool | Description |
-|------|-------------|
-| `baton_approve` | Approve pending approval |
-| `baton_reject` | Reject pending approval |
-| `baton_cancel` | Cancel a job |
-| `baton_steer` | Inject supervisor directive into running job |
-
-### baton_start_job Parameters
-
-```
-goal            (required) Job objective
-provider        "mock" | "codex" | "claude" (default: "claude")
-workspace_dir   Working directory (default: cwd)
-workspace_mode  "shared" | "isolated" (default: "shared")
-max_steps       Maximum execution steps (default: 8)
-pipeline_mode   "light" | "balanced" | "full" (default: "balanced")
-strictness_level "lenient" | "normal" | "strict" (default: "normal")
-ambition_level  "low" | "medium" | "high" | "extreme" | "custom" (default: "medium")
-role_overrides  Per-role provider/model overrides
-prompt_overrides Per-role prompt overrides (director, executor, evaluator)
-engine_build_cmd Build command (e.g., "go build ./...")
-engine_test_cmd  Test command (e.g., "pytest")
-pre_build_commands Commands to run before build
-```
-
----
-
-## Providers
-
-### Claude (Anthropic)
-
-```bash
+# Claude (Anthropic)
 export ANTHROPIC_API_KEY="sk-ant-..."
 baton run --goal "..." --provider claude
-```
 
-Default role profiles:
-- **Heavy reasoning** (director, planner, leader, evaluator): `claude-opus`
-- **Execution** (executor, reviewer, tester): `claude-sonnet`
-
-### Codex (OpenAI)
-
-```bash
+# Codex (OpenAI)
 baton run --goal "..." --provider codex
-```
 
-### Mock (Testing)
-
-No API key required. Returns deterministic responses for all pipeline phases.
-
-```bash
+# Mock (테스트용, 키 불필요)
 baton run --goal "..." --provider mock
 ```
 
-### Custom Role Profiles
-
-Create a JSON file with per-role provider/model overrides:
+역할별 모델 커스텀:
 
 ```json
 {
   "director":  { "provider": "claude", "model": "opus" },
-  "planner":   { "provider": "claude", "model": "opus" },
-  "leader":    { "provider": "claude", "model": "opus" },
-  "executor":  { "provider": "claude", "model": "sonnet" },
-  "reviewer":  { "provider": "claude", "model": "sonnet" },
-  "tester":    { "provider": "claude", "model": "sonnet" },
+  "executor":  { "provider": "codex" },
   "evaluator": { "provider": "claude", "model": "opus" }
 }
 ```
 
-```bash
-baton run --goal "..." --provider claude --profiles-file profiles.json
-```
-
----
-
-## Configuration
-
-### Workspace Structure
-
-Baton creates a `.baton/` directory in your workspace:
+## 상태 디렉토리
 
 ```
 .baton/
-├── state/
-│   ├── jobs/           # Job state (JSON per job)
-│   │   └── {job-id}.json
-│   └── chains/         # Chain state
-│       └── {chain-id}.json
-├── artifacts/          # Job artifacts
-│   └── {job-id}/
-│       ├── step-00-planning.json
-│       ├── step-01-runtime_result.json
-│       └── ...
-├── leases/             # Job heartbeat leases
-│   └── {job-id}.lease
-└── serve.pid           # API server PID file
+├── state/jobs/          # job 상태 (JSON)
+├── state/chains/        # 체인 상태
+├── artifacts/           # job별 아티팩트
+├── leases/              # 하트비트 리스
+└── serve.pid            # API 서버 PID
 ```
 
-### Workspace Modes
-
-**Shared** (default): All jobs work in the same directory. Simple, but jobs can interfere with each other.
-
-```bash
-baton run --goal "..." --workspace-mode shared
-```
-
-**Isolated**: Each job gets its own git worktree on a dedicated branch. Changes are isolated until merged.
-
-```bash
-baton run --goal "..." --workspace-mode isolated
-```
-
-### Job Status Lifecycle
-
-```
-queued -> starting -> planning -> running <-> waiting_leader
-                                         <-> waiting_worker
-                                         -> blocked (needs approval)
-                                         -> done (evaluator passed)
-                                         -> failed (evaluator rejected / max retries)
-```
-
-| Status | Description |
-|--------|-------------|
-| `queued` | Job created, not yet started |
-| `starting` | Initializing workspace and provider |
-| `planning` | Director is analyzing goal and creating sprint contract |
-| `running` | Active execution loop |
-| `waiting_leader` | Waiting for leader decision |
-| `waiting_worker` | Waiting for executor to complete task |
-| `blocked` | Requires human approval or intervention |
-| `done` | Evaluator gate passed, job complete |
-| `failed` | Evaluator rejected or unrecoverable error |
-
----
-
-## Job Chains
-
-Chains execute multiple goals sequentially, passing context between them:
-
-### Via MCP
-
-```
-baton_start_chain(goals=[
-  "scaffold the project structure",
-  "implement the core API endpoints",
-  "add comprehensive test coverage"
-], provider="claude")
-```
-
-### Chain Operations
-
-| Operation | Description |
-|-----------|-------------|
-| `baton_chain_status` | Get chain progress |
-| `baton_pause_chain` | Pause after current goal |
-| `baton_resume_chain` | Resume paused chain |
-| `baton_cancel_chain` | Cancel entire chain |
-| `baton_skip_chain_goal` | Skip current goal, advance |
-
-### Chain Status Values
-
-| Status | Description |
-|--------|-------------|
-| `running` | Chain is executing |
-| `paused` | Paused, will resume on command |
-| `done` | All goals completed |
-| `failed` | A goal failed |
-| `cancelled` | Manually cancelled |
-
----
-
-## Harness (Process Management)
-
-The harness system manages subprocesses (build servers, test runners, etc.) scoped to jobs or globally:
-
-```bash
-# Start a process
-baton harness-start --command "npm run dev" --name "dev-server" --port 3000
-
-# List running processes
-baton harness-list
-
-# Stop a process
-baton harness-stop --pid 12345
-```
-
-Job-scoped processes are automatically tracked with the job lifecycle:
-
-```bash
-# Start process scoped to a job
-baton harness-start --job <job-id> --command "pytest --watch" --name "test-watcher"
-
-# View job harness state
-baton harness-view --job <job-id>
-```
-
----
-
-## Web Dashboard
-
-The built-in web dashboard provides real-time monitoring:
-
-```bash
-baton serve --addr 127.0.0.1:8080
-```
-
-Open `http://127.0.0.1:8080` in your browser to view:
-
-- Active jobs and their status
-- Event streams
-- Step progress and artifacts
-- Approval requests
-
----
-
-## Development
-
-### Setup
+## 개발
 
 ```bash
 git clone https://github.com/jjugu/Baton.git
 cd Baton
 pip install -e ".[dev]"
+pytest                  # 342개 테스트
 ```
 
-### Run tests
+| 패키지 | 용도 |
+|--------|------|
+| pydantic >= 2.0 | 데이터 검증 |
+| fastapi >= 0.110 | HTTP API |
+| uvicorn >= 0.30 | ASGI 서버 |
+| typer >= 0.12 | CLI |
+| sse-starlette >= 2.0 | SSE 스트리밍 |
 
-```bash
-pytest
-```
+## 라이선스
 
-### Project structure
-
-```
-baton/
-├── cli.py                  # CLI entry point (Typer, 22 commands)
-├── domain/
-│   ├── types.py            # Core types, enums, models (Pydantic v2)
-│   └── errors.py           # Domain exceptions
-├── orchestrator/
-│   ├── service.py          # Main state machine & orchestration loop
-│   ├── planning.py         # Sprint contract generation
-│   ├── evaluator.py        # Evaluator gate logic
-│   ├── verification.py     # Verification contracts
-│   ├── workspace.py        # Git worktree management
-│   ├── job_runtime.py      # Job leases & heartbeats
-│   └── parallel.py         # Parallel worker planning
-├── provider/
-│   ├── base.py             # Adapter protocol (interface)
-│   ├── protocol.py         # Prompt schemas & JSON contracts
-│   ├── registry.py         # Provider registry & session manager
-│   ├── claude.py           # Claude (Anthropic) adapter
-│   ├── codex.py            # Codex (OpenAI) adapter
-│   └── mock.py             # Mock adapter (testing)
-├── mcp/
-│   └── server.py           # MCP JSON-RPC stdio server (18 tools)
-├── api/
-│   ├── server.py           # FastAPI application
-│   ├── routes.py           # HTTP endpoints
-│   └── views.py            # View builders
-├── store/
-│   ├── state_store.py      # JSON file persistence
-│   └── artifact_store.py   # Artifact materialization
-├── runtime/
-│   ├── lifecycle.py        # Process manager
-│   ├── runner.py           # Command execution
-│   └── policy.py           # Security policies
-└── web/
-    ├── index.html           # Dashboard UI
-    ├── app.js
-    └── style.css
-```
-
-### Dependencies
-
-| Package | Purpose |
-|---------|---------|
-| pydantic >= 2.0 | Data validation & serialization |
-| fastapi >= 0.110 | HTTP API framework |
-| uvicorn >= 0.30 | ASGI server |
-| typer >= 0.12 | CLI framework |
-| sse-starlette >= 2.0 | Server-Sent Events |
-
-### Dev dependencies
-
-| Package | Purpose |
-|---------|---------|
-| pytest >= 8.0 | Test framework |
-| pytest-asyncio >= 0.24 | Async test support |
-| httpx >= 0.27 | HTTP client for API tests |
+MIT
 
 ---
+
+<a id="baton-en"></a>
+
+# Baton
+
+Python asyncio multi-agent orchestration engine.
+
+```
+Director (planning) -> Leader (decisions) -> Executor (implementation) -> Evaluator (gate)
+```
+
+The Evaluator gate is inviolable -- a job cannot reach `done` status without explicit evaluator approval.
+
+## Features
+
+- **3-agent pipeline** with strict evaluator gate
+- **3 providers** -- Claude (Anthropic), Codex (OpenAI), Mock (testing)
+- **Per-role model config** -- opus for reasoning, sonnet for execution
+- **Job chains** for sequential multi-step workflows
+- **Workspace isolation** via git worktrees
+- **MCP server** for Claude Code integration
+- **HTTP API** with SSE streaming + web dashboard
+- **Token usage tracking** with real-time cost monitoring
+- **CLI** with 22 subcommands
+- **Korean/English dashboard** with language toggle
+
+## Installation
+
+```bash
+# From GitHub
+pip install git+https://github.com/jjugu/Baton.git
+
+# From source (development)
+git clone https://github.com/jjugu/Baton.git
+cd Baton
+pip install -e ".[dev]"
+
+# Verify
+baton --help
+```
+
+## Requirements
+
+- Python 3.12+
+- git (for workspace isolation)
+- AI provider: `ANTHROPIC_API_KEY` (Claude) or `codex login` (Codex) or none (Mock)
+
+## Quick Start
+
+```bash
+# Mock provider (no API key)
+baton run --goal "add hello world endpoint" --provider mock --max-steps 4
+
+# Claude provider
+export ANTHROPIC_API_KEY="sk-ant-..."
+baton run --goal "implement JWT auth middleware" --provider claude --max-steps 10
+
+# Check status
+baton status --job <job-id>
+baton status --all
+```
+
+## Architecture
+
+```
++-------------------------------------------------------------------+
+|                       Orchestrator (Service)                       |
+|                                                                    |
+|  QUEUED -> STARTING -> PLANNING -> RUNNING -> DONE / FAILED       |
+|                                                                    |
+|  +----------+    +--------+    +---------+    +-----------+        |
+|  | Director | -> | Leader | -> | Executor| -> | Evaluator |        |
+|  | (plan)   |    | (decide)|   | (work)  |    | (gate)    |        |
+|  +----------+    +--------+    +---------+    +-----------+        |
++-------------------------------------------------------------------+
+       |                |                |
+  StateStore      ArtifactStore     ProcessManager
+  (JSON files)    (.baton/artifacts)  (subprocess)
+```
+
+| Phase | Role | Model | Purpose |
+|-------|------|-------|---------|
+| Planning | Director | Heavy (opus) | Analyze goal, produce sprint contract |
+| Leadership | Leader | Heavy (opus) | Decide next action |
+| Execution | Executor | Light (sonnet) | Implement tasks, produce artifacts |
+| Verification | Evaluator | Heavy (opus) | Gate check before marking done |
+
+## Claude Code MCP Integration
+
+Add to your `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "baton": {
+      "type": "stdio",
+      "command": "baton",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+Run `/mcp` in Claude Code. 18 tools available:
+
+| Category | Tools |
+|----------|-------|
+| Jobs | `baton_start_job`, `baton_status`, `baton_events`, `baton_artifacts`, `baton_resume`, `baton_retry`, `baton_list_jobs`, `baton_diff` |
+| Chains | `baton_start_chain`, `baton_chain_status`, `baton_pause_chain`, `baton_resume_chain`, `baton_cancel_chain`, `baton_skip_chain_goal` |
+| Control | `baton_approve`, `baton_reject`, `baton_cancel`, `baton_steer` |
+
+## CLI Reference
+
+| Command | Description |
+|---------|-------------|
+| `baton run` | Start a new job (`--goal`, `--provider`, `--max-steps`) |
+| `baton status` | Get job status (`--job` or `--all`) |
+| `baton events` | Get job events |
+| `baton artifacts` | Get artifact paths |
+| `baton resume` | Resume a blocked job |
+| `baton approve` / `reject` | Handle pending approvals |
+| `baton retry` | Retry a failed job |
+| `baton cancel` | Cancel a job |
+| `baton serve` | Start HTTP API + dashboard (`--addr 127.0.0.1:8080`) |
+| `baton mcp` | Start MCP stdio server |
+
+## HTTP API
+
+```bash
+# Start server
+baton serve --addr 127.0.0.1:8080
+
+# Dashboard: http://127.0.0.1:8080/dashboard (KO/EN toggle)
+```
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/jobs` | Create job |
+| `GET` | `/jobs` | List all jobs |
+| `GET` | `/jobs/{id}` | Job details |
+| `POST` | `/jobs/{id}/approve` | Approve |
+| `POST` | `/jobs/{id}/cancel` | Cancel |
+| `POST` | `/jobs/{id}/steer` | Inject directive |
+| `GET` | `/jobs/{id}/events/stream` | SSE event stream |
+| `POST` | `/chains` | Create chain |
+| `GET` | `/healthz` | Health check |
+
+## Provider Configuration
+
+```bash
+# Claude (Anthropic)
+export ANTHROPIC_API_KEY="sk-ant-..."
+baton run --goal "..." --provider claude
+
+# Codex (OpenAI)
+baton run --goal "..." --provider codex
+
+# Mock (no key needed)
+baton run --goal "..." --provider mock
+```
+
+Custom role profiles:
+
+```json
+{
+  "director":  { "provider": "claude", "model": "opus" },
+  "executor":  { "provider": "codex" },
+  "evaluator": { "provider": "claude", "model": "opus" }
+}
+```
+
+## State Directory
+
+```
+.baton/
+├── state/jobs/          # Job state (JSON)
+├── state/chains/        # Chain state
+├── artifacts/           # Per-job artifacts
+├── leases/              # Heartbeat leases
+└── serve.pid            # API server PID
+```
+
+## Development
+
+```bash
+git clone https://github.com/jjugu/Baton.git
+cd Baton
+pip install -e ".[dev]"
+pytest                  # 342 tests
+```
+
+| Package | Purpose |
+|---------|---------|
+| pydantic >= 2.0 | Data validation |
+| fastapi >= 0.110 | HTTP API |
+| uvicorn >= 0.30 | ASGI server |
+| typer >= 0.12 | CLI |
+| sse-starlette >= 2.0 | SSE streaming |
 
 ## License
 
