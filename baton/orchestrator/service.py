@@ -188,7 +188,7 @@ class Service:
         job = self._prepare_job(input)
         self._add_event(job, "job_created", "job created")
         self._touch(job)
-        await self._state.save_job(job)
+        await self._save_and_cache(job)
         return await self._run_loop(job)
 
     async def start_async(self, input: CreateJobInput) -> Job:
@@ -196,7 +196,7 @@ class Service:
         job = self._prepare_job(input)
         self._add_event(job, "job_created", "job created")
         self._touch(job)
-        await self._state.save_job(job)
+        await self._save_and_cache(job)
         task = asyncio.create_task(self._run_loop(job))
         self._bg_tasks.add(task)
         task.add_done_callback(self._bg_tasks.discard)
@@ -220,7 +220,7 @@ class Service:
             raise ValueError("job has a pending approval; use approve or reject instead")
         if extra_steps > 0:
             self._apply_extra_steps(job, extra_steps)
-            await self._state.save_job(job)
+            await self._save_and_cache(job)
         self._add_event(job, "job_resumed", "job resumed")
         return await self._run_loop(job)
 
@@ -236,7 +236,7 @@ class Service:
         job.leader_context_summary = job.blocked_reason
         self._add_event(job, "job_cancelled", job.blocked_reason)
         self._touch(job)
-        await self._state.save_job(job)
+        await self._save_and_cache(job)
         await self._handle_chain_terminal(job)
         return job
 
@@ -252,7 +252,7 @@ class Service:
         job.leader_context_summary = f"retry #{job.retry_count} requested"
         self._add_event(job, "job_retry_requested", job.leader_context_summary)
         self._touch(job)
-        await self._state.save_job(job)
+        await self._save_and_cache(job)
         return await self._run_loop(job)
 
     async def approve(self, job_id: str) -> Job:
@@ -267,7 +267,7 @@ class Service:
         job.leader_context_summary = f"operator approved step {pending.step_index}"
         self._add_event(job, "job_approved", job.leader_context_summary)
         self._touch(job)
-        await self._state.save_job(job)
+        await self._save_and_cache(job)
         if is_terminal(job.status):
             return job
         return await self._run_loop(job)
@@ -284,7 +284,7 @@ class Service:
         job.leader_context_summary = reason
         self._add_event(job, "job_rejected", reason)
         self._touch(job)
-        await self._state.save_job(job)
+        await self._save_and_cache(job)
         await self._handle_chain_terminal(job)
         return job
 
@@ -293,7 +293,7 @@ class Service:
         job.supervisor_directive = directive.strip()
         self._add_event(job, "supervisor_directive", directive.strip())
         self._touch(job)
-        await self._state.save_job(job)
+        await self._save_and_cache(job)
         return job
 
     # -- Chain API ----------------------------------------------------------
@@ -429,7 +429,7 @@ class Service:
             self._touch(job)
             self._add_event(job, "leader_requested", "requesting leader action")
             if not completion_retry_pending:
-                await self._state.save_job(job)
+                await self._save_and_cache(job)
 
             # Run leader phase
             try:
@@ -484,14 +484,14 @@ class Service:
                     job.leader_context_summary = leader.next_hint
                     self._add_event(job, "leader_summary", "leader emitted a summary")
                     self._touch(job)
-                    await self._state.save_job(job)
+                    await self._save_and_cache(job)
 
                 case "complete":
                     # CORE INVARIANT: evaluateCompletion is NEVER bypassed
                     if completion_retry_pending and len(job.steps) == completion_retry_step_count:
                         job.status = JobStatus.BLOCKED
                         self._touch(job)
-                        await self._state.save_job(job)
+                        await self._save_and_cache(job)
                         return job
 
                     report = await self._evaluate_completion(job)
@@ -500,7 +500,7 @@ class Service:
                         job.summary = leader.reason
                         self._add_event(job, "job_completed", leader.reason)
                         self._touch(job)
-                        await self._state.save_job(job)
+                        await self._save_and_cache(job)
                         await self._handle_chain_completion(job)
                         return job
                     else:
@@ -549,7 +549,7 @@ class Service:
         job.steps.append(step)
         self._add_event(job, "worker_requested", f"{task.target}:{task.task_type}")
         self._touch(job)
-        await self._state.save_job(job)
+        await self._save_and_cache(job)
 
         try:
             raw_worker = await self._sessions.run_worker(job, task)
@@ -610,7 +610,7 @@ class Service:
 
         job.leader_context_summary = last.summary or worker.summary
         self._touch(job)
-        await self._state.save_job(job)
+        await self._save_and_cache(job)
 
     async def _run_parallel_workers(self, job: Job, plans: list[WorkerPlan]) -> None:
         """Execute multiple worker plans concurrently (max 2)."""
@@ -670,7 +670,7 @@ class Service:
 
         job.status = JobStatus.RUNNING
         self._touch(job)
-        await self._state.save_job(job)
+        await self._save_and_cache(job)
 
     # -- System step --------------------------------------------------------
 
@@ -693,7 +693,7 @@ class Service:
         job.steps.append(step)
         self._add_event(job, "system_requested", f"SYS:{leader.task_type}")
         self._touch(job)
-        await self._state.save_job(job)
+        await self._save_and_cache(job)
 
         sa = leader.system_action
         try:
@@ -717,7 +717,7 @@ class Service:
             self._add_event(job, "system_failed", str(exc))
             job.failure_reason = str(exc)
             self._touch(job)
-            await self._state.save_job(job)
+            await self._save_and_cache(job)
             return
 
         self._artifacts.materialize_system_result(job.id, step.index, result.model_dump())
@@ -735,7 +735,7 @@ class Service:
 
         job.status = JobStatus.RUNNING
         self._touch(job)
-        await self._state.save_job(job)
+        await self._save_and_cache(job)
 
     # -- Planning -----------------------------------------------------------
 
@@ -800,7 +800,7 @@ class Service:
         job.leader_context_summary = planning.summary
         self._add_event(job, "job_planned", f"planned {len(job.planning_artifacts)} artifacts")
         self._touch(job)
-        await self._state.save_job(job)
+        await self._save_and_cache(job)
 
     # -- Evaluator gate (CORE INVARIANT) ------------------------------------
 
@@ -860,7 +860,7 @@ class Service:
             self._add_event(job, "evaluation_blocked", report.reason)
 
         self._touch(job)
-        await self._state.save_job(job)
+        await self._save_and_cache(job)
         return report
 
     # -- Schema retry -------------------------------------------------------
@@ -928,7 +928,7 @@ class Service:
 
         self._add_event(job, "job_created", "job created")
         self._touch(job)
-        await self._state.save_job(job)
+        await self._save_and_cache(job)
         task = asyncio.create_task(self._run_loop(job))
         self._bg_tasks.add(task)
         task.add_done_callback(self._bg_tasks.discard)
@@ -1044,7 +1044,7 @@ class Service:
         job.failure_reason = reason
         self._add_event(job, "job_failed", reason)
         self._touch(job)
-        await self._state.save_job(job)
+        await self._save_and_cache(job)
         await self._handle_chain_terminal(job)
         return job
 
@@ -1053,7 +1053,7 @@ class Service:
         job.blocked_reason = reason
         self._add_event(job, "job_blocked", reason)
         self._touch(job)
-        await self._state.save_job(job)
+        await self._save_and_cache(job)
         await self._handle_chain_terminal(job)
         return job
 
@@ -1085,6 +1085,11 @@ class Service:
     async def _cache_update(self, job: Job) -> None:
         async with self._cache_lock:
             self._job_cache[job.id] = job.model_copy(deep=True)
+
+    async def _save_and_cache(self, job: Job) -> None:
+        """Persist job to disk and update in-memory cache atomically."""
+        await self._state.save_job(job)
+        await self._cache_update(job)
 
     def _apply_extra_steps(self, job: Job, extra: int) -> None:
         if extra <= 0:
