@@ -7,7 +7,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from baton.domain.types import Job, LeaderOutput, ProviderName, RoleName, role_for_task_type
+from baton.domain.types import Job, LeaderOutput, ProviderName, RoleName, TokenUsage, role_for_task_type
 from baton.provider.base import PhaseAdapter
 from baton.provider.command import (
     CommandResult,
@@ -50,6 +50,7 @@ class CodexAdapter:
 
     def __init__(self) -> None:
         self._executable = os.environ.get("BATON_CODEX_BIN", "codex")
+        self.last_token_usage: TokenUsage = TokenUsage()
 
     def name(self) -> ProviderName:
         return ProviderName.CODEX

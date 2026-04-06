@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 
-from baton.domain.types import Job, LeaderOutput, ProviderName, RoleName, role_for_task_type
+from baton.domain.types import Job, LeaderOutput, ProviderName, RoleName, TokenUsage, role_for_task_type
 from baton.provider.base import PhaseAdapter
 from baton.provider.command import (
     CommandResult,
@@ -40,6 +40,7 @@ class ClaudeAdapter:
 
     def __init__(self) -> None:
         self._executable = os.environ.get("BATON_CLAUDE_BIN", "claude")
+        self.last_token_usage: TokenUsage = TokenUsage()
 
     def name(self) -> ProviderName:
         return ProviderName.CLAUDE
@@ -126,8 +127,29 @@ class ClaudeAdapter:
         if not output:
             raise invalid_response_error(self.name(), exe, "empty claude response")
 
+        self.last_token_usage = _extract_token_usage(output)
         extracted = _extract_json_result(output)
         return extracted or output
+
+
+def _extract_token_usage(output: str) -> TokenUsage:
+    """Extract token usage from Claude CLI JSON envelope."""
+    try:
+        envelope = json.loads(output.strip())
+    except (json.JSONDecodeError, ValueError):
+        return TokenUsage()
+    if not isinstance(envelope, dict):
+        return TokenUsage()
+    usage = envelope.get("usage", {})
+    cost = envelope.get("total_cost_usd", 0.0)
+    input_tokens = usage.get("input_tokens", 0) + usage.get("cache_creation_input_tokens", 0) + usage.get("cache_read_input_tokens", 0)
+    output_tokens = usage.get("output_tokens", 0)
+    return TokenUsage(
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        total_tokens=input_tokens + output_tokens,
+        estimated_cost_usd=cost,
+    )
 
 
 def _extract_json_result(output: str) -> str:

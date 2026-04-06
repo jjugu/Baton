@@ -9,6 +9,7 @@ from baton.domain.types import (
     ProviderName,
     RoleName,
     RoleProfiles,
+    TokenUsage,
     role_for_task_type,
 )
 from baton.provider.base import Adapter, EvaluatorRunner, PlannerRunner
@@ -51,6 +52,7 @@ class SessionManager:
 
     def __init__(self, registry: Registry) -> None:
         self._registry = registry
+        self.last_token_usage: TokenUsage = TokenUsage()
 
     async def run_leader(self, job: Job) -> str:
         return await self._run_role(job, RoleName.LEADER, lambda a, j: a.run_leader(j))
@@ -75,7 +77,7 @@ class SessionManager:
         effective_job, profile = self._resolve_job_for_role(job, role)
         adapter, used_fallback = self._adapter_for_profile_with_source(profile)
         try:
-            return await invoke(adapter, effective_job)
+            result = await invoke(adapter, effective_job)
         except ProviderError as exc:
             if used_fallback or not _should_retry_with_fallback_model(profile, exc):
                 raise
@@ -83,7 +85,9 @@ class SessionManager:
             effective_job = effective_job.model_copy(
                 update={"role_profiles": _set_role_profile(effective_job.role_profiles, role, retry_profile)}
             )
-            return await invoke(adapter, effective_job)
+            result = await invoke(adapter, effective_job)
+        self.last_token_usage = getattr(adapter, "last_token_usage", TokenUsage())
+        return result
 
     def _resolve_profile(self, job: Job, role: RoleName) -> ExecutionProfile:
         profile = job.role_profiles.profile_for(role, ProviderName.MOCK)

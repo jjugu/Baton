@@ -439,6 +439,8 @@ class Service:
                     return await self._block_job(job, f"leader execution blocked: {exc}")
                 return await self._fail_job(job, f"leader execution failed: {exc}")
 
+            self._collect_tokens(job)
+
             # Parse leader output with schema retry
             leader = await self._parse_with_retry(
                 job, raw_leader, LeaderOutput, "leader",
@@ -568,6 +570,8 @@ class Service:
                 await self._fail_job(job, str(exc))
             return
 
+        self._collect_tokens(job, job.steps[-1] if job.steps else None)
+
         worker = await self._parse_with_retry(
             job, raw_worker, WorkerOutput, "worker",
             lambda: self._sessions.run_worker(job, task),
@@ -617,6 +621,7 @@ class Service:
         async def run_one(plan: WorkerPlan) -> tuple[WorkerPlan, str | None, Exception | None]:
             try:
                 raw = await self._sessions.run_worker(job, plan.task)
+                self._collect_tokens(job)
                 return plan, raw, None
             except Exception as exc:
                 return plan, None, exc
@@ -745,6 +750,7 @@ class Service:
 
         try:
             raw = await self._sessions.run_planner(job)
+            self._collect_tokens(job)
         except ProviderError as exc:
             if "unsupported" in str(exc).lower():
                 await self._persist_planning(job, build_planning_artifact(job))
@@ -828,6 +834,7 @@ class Service:
 
         try:
             raw = await self._sessions.run_evaluator(job)
+            self._collect_tokens(job)
         except ProviderError as exc:
             if "unsupported" in str(exc).lower():
                 provider_report = deterministic_evaluator_report(job, verification, sprint)
@@ -1085,6 +1092,22 @@ class Service:
     async def _cache_update(self, job: Job) -> None:
         async with self._cache_lock:
             self._job_cache[job.id] = job.model_copy(deep=True)
+
+    def _collect_tokens(self, job: Job, step: Step | None = None) -> None:
+        """Accumulate token usage from the last provider call."""
+        usage = self._sessions.last_token_usage
+        if usage.total_tokens == 0:
+            return
+        job.token_usage.input_tokens += usage.input_tokens
+        job.token_usage.output_tokens += usage.output_tokens
+        job.token_usage.total_tokens += usage.total_tokens
+        job.token_usage.estimated_cost_usd += usage.estimated_cost_usd
+        if step is not None:
+            step.token_usage.input_tokens += usage.input_tokens
+            step.token_usage.output_tokens += usage.output_tokens
+            step.token_usage.total_tokens += usage.total_tokens
+            step.token_usage.estimated_cost_usd += usage.estimated_cost_usd
+        self._sessions.last_token_usage = TokenUsage()
 
     async def _save_and_cache(self, job: Job) -> None:
         """Persist job to disk and update in-memory cache atomically."""
