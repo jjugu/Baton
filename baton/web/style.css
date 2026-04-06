@@ -660,6 +660,44 @@ nav {
 	overflow-y: auto;
 }
 
+.cli-output-panel {
+	background: #0d1117;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	padding: 8px 12px;
+	max-height: 320px;
+	overflow-y: auto;
+	font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+	font-size: 12px;
+	line-height: 1.6;
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
+.cli-output-panel:empty::after {
+	content: 'Waiting for CLI output...';
+	color: var(--text-secondary);
+	font-style: italic;
+}
+
+.cli-line {
+	padding: 1px 0;
+	border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+
+.cli-line:hover {
+	background: rgba(233, 69, 96, 0.06);
+}
+
+@keyframes cli-new-line {
+	from { background: rgba(15, 52, 96, 0.3); }
+	to { background: transparent; }
+}
+
+.cli-line-new {
+	animation: cli-new-line 1s ease forwards;
+}
+
 @keyframes sse-highlight-fade {
 	from { background: rgba(233, 69, 96, 0.15); }
 	to { background: transparent; }
@@ -1087,6 +1125,54 @@ nav {
 @keyframes modalFadeIn {
 	from { opacity: 0; }
 	to { opacity: 1; }
+}
+
+/* Language switch toggle */
+.lang-switch {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	cursor: pointer;
+	user-select: none;
+}
+
+.lang-switch-label {
+	font-size: 11px;
+	font-weight: 700;
+	color: var(--text-secondary);
+	transition: color var(--transition);
+}
+
+.lang-switch-label.active {
+	color: var(--text-primary);
+}
+
+.lang-switch-track {
+	width: 32px;
+	height: 18px;
+	border-radius: 9px;
+	background: var(--accent);
+	position: relative;
+	transition: background var(--transition);
+}
+
+.lang-switch-track:hover {
+	background: var(--highlight);
+}
+
+.lang-switch-thumb {
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background: #fff;
+	position: absolute;
+	top: 2px;
+	left: 2px;
+	transition: left 0.2s ease;
+}
+
+.lang-switch-thumb.right {
+	left: 16px;
 }
 
 /* Connection status indicator */

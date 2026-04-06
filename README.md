@@ -23,6 +23,7 @@ Evaluator 게이트는 절대 우회할 수 없습니다 -- `done` 상태는 반
 - **워크스페이스 격리** -- git worktree를 통한 작업 분리
 - **MCP 서버** -- Claude Code 직접 통합
 - **HTTP API** -- SSE 이벤트 스트리밍 + 웹 대시보드
+- **실시간 CLI 출력** -- Codex/Claude CLI stderr 라인별 스트리밍, 대시보드 터미널 패널
 - **토큰 사용량 추적** -- 실시간 비용 모니터링
 - **CLI** -- 22개 서브커맨드
 - **한국어/영어 대시보드** -- 언어 전환 지원
@@ -145,6 +146,7 @@ baton serve --addr 127.0.0.1:8080
 | `POST` | `/jobs/{id}/cancel` | 취소 |
 | `POST` | `/jobs/{id}/steer` | 지시 주입 |
 | `GET` | `/jobs/{id}/events/stream` | SSE 이벤트 스트림 |
+| `GET` | `/jobs/{id}/cli/stream` | SSE 실시간 CLI 출력 스트림 |
 | `POST` | `/chains` | 체인 생성 |
 | `GET` | `/healthz` | 헬스 체크 |
 
@@ -227,6 +229,7 @@ The Evaluator gate is inviolable -- a job cannot reach `done` status without exp
 - **Workspace isolation** via git worktrees
 - **MCP server** for Claude Code integration
 - **HTTP API** with SSE streaming + web dashboard
+- **Real-time CLI output** -- line-by-line stderr streaming from Codex/Claude CLI with dashboard terminal panel
 - **Token usage tracking** with real-time cost monitoring
 - **CLI** with 22 subcommands
 - **Korean/English dashboard** with language toggle
@@ -349,6 +352,7 @@ baton serve --addr 127.0.0.1:8080
 | `POST` | `/jobs/{id}/cancel` | Cancel |
 | `POST` | `/jobs/{id}/steer` | Inject directive |
 | `GET` | `/jobs/{id}/events/stream` | SSE event stream |
+| `GET` | `/jobs/{id}/cli/stream` | SSE real-time CLI output stream |
 | `POST` | `/chains` | Create chain |
 | `GET` | `/healthz` | Health check |
 

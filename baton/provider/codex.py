@@ -11,6 +11,7 @@ from baton.domain.types import Job, LeaderOutput, ProviderName, RoleName, TokenU
 from baton.provider.base import PhaseAdapter
 from baton.provider.command import (
     CommandResult,
+    LineCallback,
     probe_executable,
     run_executable_with_stdin,
     SubprocessError,
@@ -51,6 +52,7 @@ class CodexAdapter:
     def __init__(self) -> None:
         self._executable = os.environ.get("BATON_CODEX_BIN", "codex")
         self.last_token_usage: TokenUsage = TokenUsage()
+        self.on_output: LineCallback | None = None
 
     def name(self) -> ProviderName:
         return ProviderName.CODEX
@@ -134,6 +136,7 @@ class CodexAdapter:
                     cwd=workspace_dir,
                     stdin_data=prompt,
                     args=args,
+                    on_stderr=self.on_output,
                 )
             except SubprocessError as exc:
                 if _should_retry_with_fresh(exc):
@@ -144,6 +147,7 @@ class CodexAdapter:
                         cwd=workspace_dir,
                         stdin_data=prompt,
                         args=args,
+                        on_stderr=self.on_output,
                     )
                 else:
                     raise classify_command_error(

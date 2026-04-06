@@ -13,6 +13,7 @@ from baton.domain.types import (
     role_for_task_type,
 )
 from baton.provider.base import Adapter, EvaluatorRunner, PlannerRunner
+from baton.provider.command import LineCallback
 from baton.provider.errors import (
     ProviderError,
     is_fallback_eligible,
@@ -28,6 +29,10 @@ class Registry:
 
     def register(self, adapter: Adapter) -> None:
         self._adapters[adapter.name()] = adapter
+
+    @property
+    def adapters(self) -> dict[ProviderName, Adapter]:
+        return self._adapters
 
     def get(self, name: ProviderName) -> Adapter:
         adapter = self._adapters.get(name)
@@ -53,6 +58,14 @@ class SessionManager:
     def __init__(self, registry: Registry) -> None:
         self._registry = registry
         self.last_token_usage: TokenUsage = TokenUsage()
+        self._output_callback: LineCallback | None = None
+
+    def set_output_callback(self, callback: LineCallback | None) -> None:
+        """Set a callback that receives real-time CLI output lines."""
+        self._output_callback = callback
+        for adapter in self._registry._adapters.values():
+            if hasattr(adapter, "on_output"):
+                adapter.on_output = callback
 
     async def run_leader(self, job: Job) -> str:
         return await self._run_role(job, RoleName.LEADER, lambda a, j: a.run_leader(j))

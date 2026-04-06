@@ -254,6 +254,51 @@ async def stream_events(request: Request, job_id: str) -> StreamingResponse:
     )
 
 
+@router.get("/jobs/{job_id}/cli/stream")
+async def stream_cli_output(request: Request, job_id: str) -> StreamingResponse:
+    """SSE stream of real-time CLI output lines for a running job."""
+    svc = _svc(request)
+    sub = svc.subscribe_cli_output()
+
+    async def event_generator():
+        try:
+            idx = 0
+            while True:
+                if await request.is_disconnected():
+                    return
+
+                try:
+                    job = await svc.get(job_id)
+                except Exception:
+                    return
+                if str(job.status) in ("done", "failed", "blocked"):
+                    return
+
+                try:
+                    event = await asyncio.wait_for(sub.get(), timeout=0.5)
+                except asyncio.TimeoutError:
+                    continue
+
+                if event.job_id != job_id:
+                    continue
+
+                data = json.dumps({"job_id": event.job_id, "line": event.message})
+                yield f"id: {idx}\nevent: cli_output\ndata: {data}\n\n"
+                idx += 1
+        finally:
+            svc.unsubscribe_cli_output(sub)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @router.get("/jobs/{job_id}/artifacts")
 async def get_artifacts(request: Request, job_id: str) -> Any:
     svc = _svc(request)

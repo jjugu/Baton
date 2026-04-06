@@ -1,11 +1,168 @@
 'use strict';
 
+// --- i18n ---
+
+var i18nMessages = {
+  ko: {
+    'title': 'Baton 대시보드',
+    'connected': '연결됨',
+    'disconnected': '연결 끊김',
+    'auto_refresh': '자동 새로고침: ON',
+    'input_tokens': '입력 토큰',
+    'output_tokens': '출력 토큰',
+    'total_tokens': '전체 토큰',
+    'est_cost': '예상 비용',
+    'jobs': '작업',
+    'chains': '체인',
+    'search': '검색... (/ 키로 포커스)',
+    'all': '전체',
+    'running': '실행 중',
+    'done': '완료',
+    'failed': '실패',
+    'waiting': '대기',
+    'planning': '계획 중',
+    'paused': '일시정지',
+    'cancelled': '취소됨',
+    'refresh': '새로고침',
+    'no_jobs': '작업 없음',
+    'no_jobs_desc': '작업이 생성되면 여기에 표시됩니다.',
+    'no_chains': '체인 없음',
+    'no_chains_desc': '체인이 생성되면 여기에 표시됩니다.',
+    'select_item': '작업 또는 체인을 선택하세요',
+    'approve': '승인',
+    'reject': '거부',
+    'cancel': '취소',
+    'retry': '재시도',
+    'resume': '재개',
+    'steer_job': '작업 조정',
+    'steer_placeholder': '조정 메시지 입력...',
+    'send_steer': '조정 전송',
+    'token_usage': '토큰 사용량',
+    'steer_history': '조정 기록',
+    'no_steer': '조정 메시지 없음.',
+    'steps': '단계',
+    'artifacts': '아티팩트',
+    'planning_section': '계획',
+    'evaluator': '평가자',
+    'events': '이벤트',
+    'cli_output': 'CLI 출력',
+    'live_events': '실시간 이벤트',
+    'expand_to_load': '펼쳐서 로드...',
+    'progress': '진행 상황',
+    'goals': '목표',
+    'kbd_title': '키보드 단축키',
+    'kbd_next': '다음 작업',
+    'kbd_prev': '이전 작업',
+    'kbd_open': '선택 열기',
+    'kbd_deselect': '선택 해제 / 닫기',
+    'kbd_search': '검색 포커스',
+    'kbd_help': '단축키 도움말',
+    'kbd_refresh': '새로고침',
+    'lang_toggle': 'EN',
+  },
+  en: {
+    'title': 'Baton Dashboard',
+    'connected': 'Connected',
+    'disconnected': 'Disconnected',
+    'auto_refresh': 'Auto-refresh: ON',
+    'input_tokens': 'Input Tokens',
+    'output_tokens': 'Output Tokens',
+    'total_tokens': 'Total Tokens',
+    'est_cost': 'Est. Cost',
+    'jobs': 'Jobs',
+    'chains': 'Chains',
+    'search': 'Search... (press / to focus)',
+    'all': 'All',
+    'running': 'Running',
+    'done': 'Done',
+    'failed': 'Failed',
+    'waiting': 'Waiting',
+    'planning': 'Planning',
+    'paused': 'Paused',
+    'cancelled': 'Cancelled',
+    'refresh': 'Refresh',
+    'no_jobs': 'No jobs found',
+    'no_jobs_desc': 'Jobs will appear here when created. Try adjusting your filters.',
+    'no_chains': 'No chains found',
+    'no_chains_desc': 'Chains will appear here when created.',
+    'select_item': 'Select a job or chain to view details',
+    'approve': 'Approve',
+    'reject': 'Reject',
+    'cancel': 'Cancel',
+    'retry': 'Retry',
+    'resume': 'Resume',
+    'steer_job': 'Steer Job',
+    'steer_placeholder': 'Enter steer message...',
+    'send_steer': 'Send Steer',
+    'token_usage': 'Token Usage',
+    'steer_history': 'Steer History',
+    'no_steer': 'No steer messages.',
+    'steps': 'Steps',
+    'artifacts': 'Artifacts',
+    'planning_section': 'Planning',
+    'evaluator': 'Evaluator',
+    'events': 'Events',
+    'cli_output': 'CLI Output',
+    'live_events': 'Live Events',
+    'expand_to_load': 'Expand to load...',
+    'progress': 'Progress',
+    'goals': 'Goals',
+    'kbd_title': 'Keyboard Shortcuts',
+    'kbd_next': 'Next job',
+    'kbd_prev': 'Previous job',
+    'kbd_open': 'Open selected',
+    'kbd_deselect': 'Deselect / Close',
+    'kbd_search': 'Focus search',
+    'kbd_help': 'Toggle this help',
+    'kbd_refresh': 'Refresh',
+    'lang_toggle': '한국어',
+  }
+};
+
+var currentLang = localStorage.getItem('baton-lang') || 'ko';
+
+function i18n(key) {
+  return (i18nMessages[currentLang] || i18nMessages['en'])[key] || key;
+}
+
+function applyI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(function(el) {
+    el.textContent = i18n(el.getAttribute('data-i18n'));
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(function(el) {
+    el.placeholder = i18n(el.getAttribute('data-i18n-placeholder'));
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach(function(el) {
+    el.title = i18n(el.getAttribute('data-i18n-title'));
+  });
+  document.title = i18n('title');
+
+  // Update switch thumb position and label highlight
+  var thumb = document.getElementById('lang-thumb');
+  if (thumb) {
+    thumb.classList.toggle('right', currentLang === 'en');
+  }
+  document.querySelectorAll('.lang-ko').forEach(function(el) {
+    el.classList.toggle('active', currentLang === 'ko');
+  });
+  document.querySelectorAll('.lang-en').forEach(function(el) {
+    el.classList.toggle('active', currentLang === 'en');
+  });
+}
+
+function toggleLang() {
+  currentLang = currentLang === 'ko' ? 'en' : 'ko';
+  localStorage.setItem('baton-lang', currentLang);
+  applyI18n();
+}
+
 var BASE_URL = window.location.origin;
 var currentJobId = null;
 var currentChainId = null;
 var activePanel = 'jobs';
 var refreshTimer = null;
 var activeSSE = null;
+var activeCliSSE = null;
 var allJobs = [];
 var allChains = [];
 var seenJobEventNotices = Object.create(null);
@@ -210,7 +367,7 @@ function fetchJobs() {
 function renderJobList(jobs) {
 	var el = document.getElementById('job-list');
 	if (!jobs.length) {
-		renderEmptyState(el, 'No jobs found', 'Jobs will appear here when created. Try adjusting your filters.');
+		renderEmptyState(el, i18n('no_jobs'), i18n('no_jobs_desc'));
 		return;
 	}
 	var html = '';
@@ -334,9 +491,9 @@ function renderJobDetail(job) {
 
 	// Reset lazy-loaded sections on job switch
 	loadedSections = {};
-	document.getElementById('detail-artifacts').innerHTML = '<p class="secondary loading-small">Expand to load...</p>';
-	document.getElementById('detail-planning').innerHTML = '<p class="secondary loading-small">Expand to load...</p>';
-	document.getElementById('detail-evaluator').innerHTML = '<p class="secondary loading-small">Expand to load...</p>';
+	document.getElementById('detail-artifacts').innerHTML = '<p class="secondary loading-small">' + i18n('expand_to_load') + '</p>';
+	document.getElementById('detail-planning').innerHTML = '<p class="secondary loading-small">' + i18n('expand_to_load') + '</p>';
+	document.getElementById('detail-evaluator').innerHTML = '<p class="secondary loading-small">' + i18n('expand_to_load') + '</p>';
 
 	// Mark selected in list
 	var items = document.querySelectorAll('#job-list .list-item');
@@ -447,6 +604,8 @@ function openSSE(jobId, job) {
 		return;
 	}
 
+	openCliSSE(jobId, job);
+
 	var sseEl = document.getElementById('detail-sse-events');
 	sseEl.innerHTML = '';
 	setSSEIndicator('sse-connecting', 'Connecting...');
@@ -510,6 +669,65 @@ function closeSSE() {
 		activeSSE = null;
 	}
 	setSSEIndicator('sse-off', 'Disconnected');
+	closeCliSSE();
+}
+
+function openCliSSE(jobId, job) {
+	closeCliSSE();
+
+	if (!shouldStreamJob(job)) {
+		setCliSSEIndicator('sse-off');
+		return;
+	}
+
+	var cliEl = document.getElementById('detail-cli-output');
+	cliEl.innerHTML = '';
+	setCliSSEIndicator('sse-connecting');
+
+	var es = new EventSource(BASE_URL + '/jobs/' + jobId + '/cli/stream');
+	activeCliSSE = es;
+
+	es.onopen = function() {
+		setCliSSEIndicator('sse-on');
+	};
+
+	es.addEventListener('cli_output', function(e) {
+		try {
+			var data = JSON.parse(e.data);
+			setCliSSEIndicator('sse-on');
+
+			var line = document.createElement('div');
+			line.className = 'cli-line cli-line-new';
+			line.textContent = data.line || '';
+			cliEl.appendChild(line);
+
+			// Auto-scroll to bottom
+			cliEl.scrollTop = cliEl.scrollHeight;
+
+			// Cap at 200 lines
+			while (cliEl.children.length > 200) {
+				cliEl.removeChild(cliEl.firstChild);
+			}
+		} catch(ex) { console.error('CLI SSE parse error:', ex); }
+	});
+
+	es.onerror = function() {
+		setCliSSEIndicator('sse-off');
+	};
+}
+
+function closeCliSSE() {
+	if (activeCliSSE) {
+		activeCliSSE.close();
+		activeCliSSE = null;
+	}
+	setCliSSEIndicator('sse-off');
+}
+
+function setCliSSEIndicator(cls) {
+	var ind = document.getElementById('cli-sse-indicator');
+	if (!ind) return;
+	ind.className = 'sse-indicator ' + cls;
 }
 
 function setSSEIndicator(cls, title) {
@@ -602,7 +820,7 @@ function fetchChains() {
 function renderChainList(chains) {
 	var el = document.getElementById('chain-list');
 	if (!chains.length) {
-		renderEmptyState(el, 'No chains found', 'Chains will appear here when created.');
+		renderEmptyState(el, i18n('no_chains'), i18n('no_chains_desc'));
 		return;
 	}
 	var html = '';
@@ -867,6 +1085,7 @@ function startAutoRefresh() {
 
 // --- Init ---
 
+applyI18n();
 fetchJobs();
 startAutoRefresh();
 

@@ -173,6 +173,23 @@ class Service:
         )
         self._runner = Runner(policy=default_policy())
         self._processes = ProcessManager(policy=default_policy())
+        # Wire real-time CLI output to event queue
+        self._active_cli_job_id: str = ""
+        self._cli_subscribers: list[asyncio.Queue[EventNotification]] = []
+        sessions.set_output_callback(self._on_cli_output)
+
+    def subscribe_cli_output(self) -> asyncio.Queue[EventNotification]:
+        """Create a subscriber queue for real-time CLI output events."""
+        q: asyncio.Queue[EventNotification] = asyncio.Queue(maxsize=200)
+        self._cli_subscribers.append(q)
+        return q
+
+    def unsubscribe_cli_output(self, q: asyncio.Queue[EventNotification]) -> None:
+        """Remove a CLI output subscriber."""
+        try:
+            self._cli_subscribers.remove(q)
+        except ValueError:
+            pass
 
     @property
     def workspace_root(self) -> str:
@@ -432,12 +449,15 @@ class Service:
                 await self._save_and_cache(job)
 
             # Run leader phase
+            self._active_cli_job_id = job.id
             try:
                 raw_leader = await self._sessions.run_leader(job)
             except ProviderError as exc:
                 if exc.recommended_action == ErrorAction.BLOCK:
                     return await self._block_job(job, f"leader execution blocked: {exc}")
                 return await self._fail_job(job, f"leader execution failed: {exc}")
+            finally:
+                self._active_cli_job_id = ""
 
             self._collect_tokens(job)
 
@@ -553,6 +573,7 @@ class Service:
         self._touch(job)
         await self._save_and_cache(job)
 
+        self._active_cli_job_id = job.id
         try:
             raw_worker = await self._sessions.run_worker(job, task)
         except ProviderError as exc:
@@ -569,6 +590,8 @@ class Service:
                 self._add_event(job, "worker_failed", str(exc))
                 await self._fail_job(job, str(exc))
             return
+        finally:
+            self._active_cli_job_id = ""
 
         self._collect_tokens(job, job.steps[-1] if job.steps else None)
 
@@ -619,12 +642,15 @@ class Service:
     async def _run_parallel_workers(self, job: Job, plans: list[WorkerPlan]) -> None:
         """Execute multiple worker plans concurrently (max 2)."""
         async def run_one(plan: WorkerPlan) -> tuple[WorkerPlan, str | None, Exception | None]:
+            self._active_cli_job_id = job.id
             try:
                 raw = await self._sessions.run_worker(job, plan.task)
                 self._collect_tokens(job)
                 return plan, raw, None
             except Exception as exc:
                 return plan, None, exc
+            finally:
+                self._active_cli_job_id = ""
 
         results = await asyncio.gather(*(run_one(p) for p in plans))
         for plan, raw, exc in results:
@@ -748,6 +774,7 @@ class Service:
         if job.planning_artifacts and job.sprint_contract_ref.strip():
             return
 
+        self._active_cli_job_id = job.id
         try:
             raw = await self._sessions.run_planner(job)
             self._collect_tokens(job)
@@ -757,6 +784,8 @@ class Service:
                 return
             await self._fail_job(job, f"planner execution failed: {exc}")
             return
+        finally:
+            self._active_cli_job_id = ""
 
         try:
             planner_output = PlanningArtifact.model_validate_json(raw)
@@ -832,6 +861,7 @@ class Service:
                 job.steps,
             )
 
+        self._active_cli_job_id = job.id
         try:
             raw = await self._sessions.run_evaluator(job)
             self._collect_tokens(job)
@@ -851,6 +881,8 @@ class Service:
                 provider_report = EvaluatorReport.model_validate_json(raw)
             except Exception:
                 provider_report = deterministic_evaluator_report(job, verification, sprint)
+        finally:
+            self._active_cli_job_id = ""
 
         report = merge_evaluator_report(job, verification, sprint, provider_report)
         report_path = self._artifacts.materialize_json_artifact(
@@ -1072,6 +1104,22 @@ class Service:
 
     def _release_job_run(self, job_id: str) -> None:
         self._running_jobs.discard(job_id)
+
+    def _on_cli_output(self, line: str) -> None:
+        """Forward real-time CLI stderr lines to event queue and subscribers."""
+        job_id = self._active_cli_job_id
+        if not job_id:
+            return
+        notification = EventNotification(job_id=job_id, kind="cli_output", message=line)
+        try:
+            self._event_queue.put_nowait(notification)
+        except asyncio.QueueFull:
+            pass
+        for q in self._cli_subscribers:
+            try:
+                q.put_nowait(notification)
+            except asyncio.QueueFull:
+                pass
 
     def _add_event(self, job: Job, kind: str, message: str) -> None:
         job.events.append(Event(

@@ -7,9 +7,16 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import shutil
 from dataclasses import dataclass, field
+from typing import Callable
+
+_log = logging.getLogger(__name__)
+
+# Type for real-time line callbacks
+LineCallback = Callable[[str], None]
 
 
 # Safe env vars for provider subprocesses (includes API keys)
@@ -83,8 +90,14 @@ async def run_executable_with_stdin(
     env_extra: list[str] | None = None,
     stdin_data: str = "",
     args: list[str] | None = None,
+    on_stderr: LineCallback | None = None,
 ) -> CommandResult:
-    """Run *executable* with optional stdin, capturing stdout/stderr."""
+    """Run *executable* with optional stdin, capturing stdout/stderr.
+
+    If *on_stderr* is provided, stderr lines are streamed to the callback
+    in real time (line-by-line) while still being collected for the final
+    CommandResult.
+    """
     path = shutil.which(executable)
     if path is None:
         raise FileNotFoundError(f"executable not found: {executable}")
@@ -98,15 +111,37 @@ async def run_executable_with_stdin(
         cwd=cwd or None,
         env=env,
     )
-    try:
-        raw_out, raw_err = await asyncio.wait_for(
-            proc.communicate(input=stdin_data.encode() if stdin_data else None),
-            timeout=timeout,
-        )
-    except asyncio.TimeoutError:
-        proc.kill()
-        raw_out, raw_err = await proc.communicate()
-        raise TimeoutError(f"provider command timed out: {executable}")
+
+    # Feed stdin
+    if proc.stdin is not None:
+        if stdin_data:
+            proc.stdin.write(stdin_data.encode())
+        proc.stdin.close()
+
+    if on_stderr is not None:
+        # Stream stderr line-by-line while collecting stdout in bulk
+        try:
+            raw_out, raw_err = await asyncio.wait_for(
+                _stream_stderr(proc, on_stderr),
+                timeout=timeout,
+            )
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.communicate()
+            raise TimeoutError(f"provider command timed out: {executable}")
+    else:
+        # Original batch mode
+        try:
+            raw_out, raw_err = await asyncio.wait_for(
+                _batch_communicate(proc),
+                timeout=timeout,
+            )
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.communicate()
+            raise TimeoutError(f"provider command timed out: {executable}")
+
+    await proc.wait()
 
     result = CommandResult(
         exit_code=proc.returncode or 0,
@@ -116,6 +151,41 @@ async def run_executable_with_stdin(
     if proc.returncode and proc.returncode != 0:
         raise subprocess_error(executable, result)
     return result
+
+
+async def _batch_communicate(proc: asyncio.subprocess.Process) -> tuple[bytes, bytes]:
+    """Read stdout and stderr in one shot (original behavior)."""
+    raw_out, raw_err = await proc.communicate()
+    return raw_out, raw_err
+
+
+async def _stream_stderr(
+    proc: asyncio.subprocess.Process,
+    on_stderr: LineCallback,
+) -> tuple[bytes, bytes]:
+    """Read stdout in bulk, stream stderr line-by-line to callback."""
+    stderr_chunks: list[bytes] = []
+
+    async def _read_stderr() -> None:
+        assert proc.stderr is not None
+        while True:
+            line = await proc.stderr.readline()
+            if not line:
+                break
+            stderr_chunks.append(line)
+            text = line.decode(errors="replace").rstrip("\n\r")
+            if text:
+                try:
+                    on_stderr(text)
+                except Exception:
+                    _log.debug("on_stderr callback error", exc_info=True)
+
+    async def _read_stdout() -> bytes:
+        assert proc.stdout is not None
+        return await proc.stdout.read()
+
+    raw_out, _ = await asyncio.gather(_read_stdout(), _read_stderr())
+    return raw_out, b"".join(stderr_chunks)
 
 
 class SubprocessError(Exception):
